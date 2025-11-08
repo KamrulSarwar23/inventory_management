@@ -9,14 +9,14 @@
   <!-- Sidebar -->
   <div class="sidebar">
     <!-- Sidebar user panel (optional) -->
-    <div class="user-panel mt-3 pb-3 mb-3 d-flex">
+    {{-- <div class="user-panel mt-3 pb-3 mb-3 d-flex">
       <div class="image">
         <img src="{{asset('dist/img/user2-160x160.jpg')}}" class="img-circle elevation-2" alt="User Image">
       </div>
       <div class="info">
         <a href="#" class="d-block">Alexander Pierce</a>
       </div>
-    </div>
+    </div> --}}
 
 
     <!-- SidebarSearch Form -->
@@ -37,14 +37,14 @@
         <!-- Add icons to the links using the .nav-icon class
                with font-awesome or any other icon font library -->
        
-       <li class="nav-item {{ request()->routeIs('dashboard') ? 'menu-open active' : '' }}">
-    <a href="{{ url('/') }}" class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
+    <li style="margin-left: -4px" class="nav-item {{ request()->routeIs('dashboard') ? 'menu-open active' : '' }}">
+        <a href="{{ route('dashboard') }}" class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
         <i class="nav-icon fas fa-tachometer-alt"></i>
         <p>
             Dashboard
         </p>
-    </a>
-</li>
+       </a>
+    </li>
 
 <!-- Product -->
 <li class="nav-item {{ request()->routeIs(['products.index', 'products.create', 'products.show', 'products.edit']) ? 'menu-open active' : '' }}">

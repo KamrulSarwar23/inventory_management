@@ -1,6 +1,5 @@
 <?php
 
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,7 +17,7 @@ class Order extends Model
         'order_total',
         'paid_amount',
         'remark',
-        'status_id',
+        'status', // Changed from status_id to status
         'discount',
         'vat',
     ];
@@ -28,7 +27,7 @@ class Order extends Model
         return $this->hasMany(OrderDetail::class);
     }
 
-   protected $casts = [
+    protected $casts = [
         'order_date' => 'date',
         'delivery_date' => 'date',
     ];
@@ -36,5 +35,21 @@ class Order extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class, 'customer_id');
+    }
+
+    // Status constants
+    const STATUS_PENDING = 'pending';
+    const STATUS_PROCESSING = 'processing';
+    const STATUS_COMPLETED = 'completed';
+    const STATUS_CANCELLED = 'cancelled';
+
+    public static function getStatuses()
+    {
+        return [
+            self::STATUS_PENDING => 'Pending',
+            self::STATUS_PROCESSING => 'Processing',
+            self::STATUS_COMPLETED => 'Completed',
+            self::STATUS_CANCELLED => 'Cancelled',
+        ];
     }
 }

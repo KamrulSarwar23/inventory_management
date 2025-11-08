@@ -13,20 +13,22 @@ use App\Http\Controllers\InvoiceController;
 
 Route::get('/', function () {
     return view('pages.Dashboard.home');
-});
+})->name('dashboard');
 
-Route::resource('categories', CategoryController::class);
 Route::resource('products', ProductController::class);
+Route::resource('categories', CategoryController::class);
 Route::resource('customers', CustomerController::class);
 Route::resource('warehouses', WarehouseController::class);
 Route::resource('suppliers', SupplierController::class);
 Route::resource('shippers', ShipperController::class);
 
+Route::resource('orders', OrderController::class);
+Route::get('/orders/{id}/delete',[OrderController::class,'delete']);
+
+
 Route::resource('purchases', PurchaseController::class);
 Route::get('/purchases/{id}/delete',[PurchaseController::class,'delete']);
 
-Route::resource('orders', OrderController::class);
-Route::get('/orders/{id}/delete',[OrderController::class,'delete']);
 
 Route::resource('invoices',InvoiceController::class);
 Route::get('/invoices/{id}/delete',[InvoiceController::class,'delete']);

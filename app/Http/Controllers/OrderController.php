@@ -9,7 +9,6 @@ use App\Models\OrderDetail;
 use App\Models\Customer;
 use App\Models\Product;
 
-
 class OrderController extends Controller
 {
     public function index(Request $request)
@@ -30,100 +29,130 @@ class OrderController extends Controller
         return view('pages.orders.create', compact('customers', 'products'));
     }
 
-
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'customer_id' => 'required',
+            'customer_id' => 'required|exists:customers,id',
             'order_date' => 'required|date',
-            'delivery_date' => 'required|date',
-            'order_total' => 'required|numeric',
-            'paid_amount' => 'nullable|numeric',
-            'shipping_address' => 'nullable|string',
-            'discount' => 'nullable|numeric',
-            'vat' => 'nullable|numeric',
-            'items' => 'required|array',
+            'delivery_date' => 'required|date|after_or_equal:order_date',
+            'order_total' => 'required|numeric|min:0',
+            'paid_amount' => 'nullable|numeric|min:0',
+            'shipping_address' => 'nullable|string|max:500',
+            'discount' => 'nullable|numeric|min:0',
+            'vat' => 'nullable|numeric|min:0',
+            'remark' => 'nullable|string|max:500',
+            'status' => 'required|in:pending,processing,completed,cancelled',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.qty' => 'required|numeric|min:0.01',
+            'items.*.price' => 'required|numeric|min:0',
+            'items.*.vat' => 'nullable|numeric|min:0',
+            'items.*.discount' => 'nullable|numeric|min:0',
         ]);
 
-        DB::transaction(function () use ($validated) {
-            $order = Order::create($validated);
-            foreach ($validated['items'] as $item) {
-                $item['order_id'] = $order->id;
-                OrderDetail::create($item);
-            }
-        });
+        try {
+            DB::transaction(function () use ($validated) {
+                $order = Order::create($validated);
+                
+                foreach ($validated['items'] as $item) {
+                    OrderDetail::create([
+                        'order_id' => $order->id,
+                        'product_id' => $item['product_id'],
+                        'qty' => $item['qty'],
+                        'price' => $item['price'],
+                        'vat' => $item['vat'] ?? 0,
+                        'discount' => $item['discount'] ?? 0,
+                    ]);
+                }
+            });
 
-        return redirect()->route('orders.index')->with('success', 'Order created successfully');
+            return redirect()->route('orders.index')->with('success', 'Order created successfully!');
+            
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to create order: ' . $e->getMessage())->withInput();
+        }
     }
 
-    public function show(string $id)
-    {
-        $order = Order::find($id);
-        $customer = Customer::find($order->customer_id);
-        $details = DB::table('orders as o')
-            ->join('order_details as d', 'o.id', '=', 'd.order_id')
-            ->join('products as p', 'p.id', '=', 'd.product_id')
-            ->where('o.id', $id)
-            ->select('p.id', 'p.name', 'd.qty', 'd.price', 'd.discount', 'd.vat')
-            ->get();
-
-        return view("pages.orders.show", ["order" => $order, "details" => $details, "customer" => $customer]);
-    }
+        public function show(string $id)
+        {
+            $order = Order::with(['customer', 'details.product'])->findOrFail($id);
+            return view("pages.orders.show", compact('order'));
+        }
 
     public function edit($id)
     {
+        $order = Order::with(['customer', 'details.product'])->findOrFail($id);
+        $customers = Customer::all(['id', 'name']);
+        $products = Product::all(['id', 'name', 'price']);
         
-        $order = Order::with('customer')->findOrFail($id);
-        $customer = $order->customer;
-
-        $details = $order->details()->with('product')->get();
-
-        return view('pages.orders.edit', compact('order', 'customer', 'details'));
+        return view('pages.orders.edit', compact('order', 'customers', 'products'));
     }
 
- public function update(Request $request, $id)
-{
-    $validated = $request->validate([
-        'customer_id' => 'required',
-        'order_date' => 'required|date',
-        'delivery_date' => 'required|date',
-        'order_total' => 'required|numeric',
-        'paid_amount' => 'nullable|numeric',
-        'shipping_address' => 'nullable|string',
-        'discount' => 'nullable|numeric',
-        'vat' => 'nullable|numeric',
-        'items' => 'required|array',
-    ]);
+    public function update(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+            'order_date' => 'required|date',
+            'delivery_date' => 'required|date|after_or_equal:order_date',
+            'order_total' => 'required|numeric|min:0',
+            'paid_amount' => 'nullable|numeric|min:0',
+            'shipping_address' => 'nullable|string|max:500',
+            'discount' => 'nullable|numeric|min:0',
+            'vat' => 'nullable|numeric|min:0',
+            'remark' => 'nullable|string|max:500',
+            'status' => 'required|in:pending,processing,completed,cancelled',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.qty' => 'required|numeric|min:0.01',
+            'items.*.price' => 'required|numeric|min:0',
+            'items.*.vat' => 'nullable|numeric|min:0',
+            'items.*.discount' => 'nullable|numeric|min:0',
+        ]);
 
-    $order = Order::findOrFail($id);
+        $order = Order::findOrFail($id);
 
-    DB::transaction(function () use ($validated, $order) {
-        // Update the order
-        $order->update($validated);
+        try {
+            DB::transaction(function () use ($validated, $order) {
+                // Update the order
+                $order->update($validated);
 
-        // Delete existing order details
-        $order->details()->delete();
+                // Delete existing order details
+                $order->details()->delete();
 
-        // Create new order details
-        foreach ($validated['items'] as $item) {
-            OrderDetail::create([
-                'order_id' => $order->id,
-                'product_id' => $item['product_id'],
-                'qty' => $item['qty'],
-                'price' => $item['price'],
-                'vat' => $item['vat'] ?? 0,
-                'discount' => $item['discount'] ?? 0,
-            ]);
+                // Create new order details
+                foreach ($validated['items'] as $item) {
+                    OrderDetail::create([
+                        'order_id' => $order->id,
+                        'product_id' => $item['product_id'],
+                        'qty' => $item['qty'],
+                        'price' => $item['price'],
+                        'vat' => $item['vat'] ?? 0,
+                        'discount' => $item['discount'] ?? 0,
+                    ]);
+                }
+            });
+
+            return redirect()->route('orders.index')->with('success', 'Order updated successfully!');
+            
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to update order: ' . $e->getMessage())->withInput();
         }
-    });
-
-    return redirect()->route('orders.index')->with('success', 'Order updated successfully');
-}
+    }
 
     public function destroy($id)
     {
         $order = Order::findOrFail($id);
-        $order->delete();
-        return redirect('orders');
+        
+        try {
+            DB::transaction(function () use ($order) {
+                $order->details()->delete();
+                $order->delete();
+            });
+            
+            return redirect()->route('orders.index')->with('success', 'Order deleted successfully!');
+            
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to delete order: ' . $e->getMessage());
+        }
     }
 }

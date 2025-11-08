@@ -20,7 +20,7 @@ return new class extends Migration
             $table->decimal('order_total', 12, 2)->default(0);
             $table->decimal('paid_amount', 12, 2)->default(0);
             $table->text('remark')->nullable();
-            // $table->foreignId('status_id')->constrained()->onDelete('cascade')->default(1);
+            $table->string('status')->default('pending');
             $table->decimal('discount', 10, 2)->default(0);
             $table->decimal('vat', 10, 2)->default(0);
             $table->timestamps();

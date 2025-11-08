@@ -78,30 +78,30 @@
           <tr>
             <td>{{ $order->id }}</td>
             <td>{{ $order->customer->name ?? 'N/A' }}</td>
-            <td>{{ \Carbon\Carbon::parse($order->order_date)->format('d-m-Y h:i A') }}</td>
-            <td>{{ \Carbon\Carbon::parse($order->delivery_date)->format('d-m-Y h:i A') }}</td>
+            <td>{{ $order->order_date->format('d-m-Y') }}</td>
+            <td>{{ $order->delivery_date ? $order->delivery_date->format('d-m-Y') : 'N/A' }}</td>
             <td class="fw-semibold">{{ number_format($order->order_total, 2) }}</td>
             <td>
               @php
                 $statusClasses = [
-                  1 => 'bg-confirmed',
-                  2 => 'bg-processing',
-                  3 => 'bg-completed',
-                  4 => 'bg-cancelled'
+                  'pending' => 'bg-pending',
+                  'processing' => 'bg-processing',
+                  'completed' => 'bg-completed',
+                  'cancelled' => 'bg-cancelled'
                 ];
                 $statusNames = [
-                  1 => 'Confirmed',
-                  2 => 'Processing',
-                  3 => 'Completed',
-                  4 => 'Cancelled'
+                  'pending' => 'Pending',
+                  'processing' => 'Processing',
+                  'completed' => 'Completed',
+                  'cancelled' => 'Cancelled'
                 ];
               @endphp
-              <span class="status-badge {{ $statusClasses[$order->status_id] ?? 'bg-light text-dark' }}">
-                {{ $statusNames[$order->status_id] ?? 'Unknown' }}
+              <span class="status-badge {{ $statusClasses[$order->status] ?? 'bg-light text-dark' }}">
+                {{ $statusNames[$order->status] ?? 'Unknown' }}
               </span>
             </td>
             <td class="text-center">
-              <div class="btn-group" role="group">
+              <div class="btn-group " role="group">
                 <a href="{{ route('orders.show', $order->id) }}" class="btn btn-primary btn-sm">
                   <i class="fas fa-eye me-1"></i> View
                 </a>

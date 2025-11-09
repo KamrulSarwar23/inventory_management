@@ -1,23 +1,15 @@
 @extends('layouts.master')
 @section('page')
 
-<?php
-use App\Models\Supplier;
-use App\Models\Product;
-use App\Models\Warehouse;
-
-$suppliers = Supplier::all();
-$products = Product::all();
-$warehouses = Warehouse::all();
-?>
-
 <div class="container py-5">
- 
   <div class="card shadow rounded-4 p-4 bg-light border-0">
-      <div class="invoice-header ">
-        <h1 class=" mb-4 fw-bold ">Create Purchase Order</h1>
+      <div class="invoice-header">
+        <h1 class="mb-4 fw-bold">Create Purchase Order</h1>
       </div>
-    <form id="purchaseForm">
+    
+    <form action="{{ url('purchases') }}" method="POST" id="purchaseForm">
+      @csrf
+      
       <div class="row mb-3">
         <div class="col-md-6">
           <label class="form-label">Supplier</label>
@@ -38,15 +30,25 @@ $warehouses = Warehouse::all();
         </div>
       </div>
 
-      {{-- Warehouse Select --}}
-      <div class="mb-3">
-        <label class="form-label">Warehouse</label>
-        <select class="form-select" name="warehouse_id" required>
-          <option value="">Select Warehouse</option>
-          @foreach ($warehouses as $warehouse)
-            <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
-          @endforeach
-        </select>
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Warehouse</label>
+          <select class="form-select" name="warehouse_id" required>
+            <option value="">Select Warehouse</option>
+            @foreach ($warehouses as $warehouse)
+              <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Status</label>
+          <select class="form-select" name="status" required>
+            <option value="">Select Status</option>
+              <option value="pending">Pending</option>
+              <option value="completed">Completed</option>
+              <option value="cancel">Cancel</option>
+          </select>
+        </div>
       </div>
 
       <div class="mb-3">
@@ -57,26 +59,26 @@ $warehouses = Warehouse::all();
       <div class="row mb-3">
         <div class="col-md-4">
           <label class="form-label">Purchase Total</label>
-          <input type="number" step="0.01" name="purchase_total" class="form-control" required />
+          <input type="number" step="0.01" name="purchase_total" class="form-control" required readonly />
         </div>
         <div class="col-md-4">
           <label class="form-label">Paid Amount</label>
-          <input type="number" step="0.01" name="paid_amount" class="form-control" />
+          <input type="number" step="0.01" name="paid_amount" class="form-control" value="0" />
         </div>
         <div class="col-md-4">
-          <label class="form-label">Status ID</label>
-          <input type="number" name="status_id" class="form-control" required />
+          <label class="form-label">Remaining Amount</label>
+          <input type="number" step="0.01" name="remaining_amount" class="form-control" readonly />
         </div>
       </div>
 
       <div class="row mb-3">
         <div class="col-md-6">
           <label class="form-label">Discount</label>
-          <input type="number" step="0.01" name="discount" class="form-control" />
+          <input type="number" step="0.01" name="discount" class="form-control" value="0" />
         </div>
         <div class="col-md-6">
           <label class="form-label">VAT</label>
-          <input type="number" step="0.01" name="vat" class="form-control" />
+          <input type="number" step="0.01" name="vat" class="form-control" value="0" />
         </div>
       </div>
 
@@ -103,17 +105,19 @@ $warehouses = Warehouse::all();
           <tr class="item-row">
             <td class="serial text-center">1</td>
             <td>
-              <select class="form-select" name="items[0][product_id]" required>
+              <select class="form-select product-select" name="items[0][product_id]" required>
                 <option value="">Select</option>
                 @foreach ($products as $product)
-                  <option value="{{ $product->id }}">{{ $product->name }}</option>
+                  <option value="{{ $product->id }}" data-price="{{ $product->price ?? 0 }}">
+                    {{ $product->name }}
+                  </option>
                 @endforeach
               </select>
             </td>
-            <td><input type="number" name="items[0][qty]" class="form-control calc" required></td>
-            <td><input type="number" name="items[0][price]" class="form-control calc" required></td>
-            <td><input type="number" name="items[0][vat]" class="form-control calc" value="0"></td>
-            <td><input type="number" name="items[0][discount]" class="form-control calc" value="0"></td>
+            <td><input type="number" name="items[0][qty]" class="form-control calc" value="1" required min="1"></td>
+            <td><input type="number" name="items[0][price]" class="form-control calc price-input" value="0" required step="0.01"></td>
+            <td><input type="number" name="items[0][vat]" class="form-control calc" value="0" step="0.01"></td>
+            <td><input type="number" name="items[0][discount]" class="form-control calc" value="0" step="0.01"></td>
             <td><input type="text" class="form-control total-field" readonly value="0.00"></td>
             <td><button type="button" class="btn btn-outline-danger remove-item"><i class="fa-solid fa-trash"></i></button></td>
           </tr>
@@ -125,7 +129,7 @@ $warehouses = Warehouse::all();
       </div>
 
       <button type="button" class="btn btn-outline-primary mb-3" id="addItem">+ Add Item</button>
-      <button type="submit" class="btn btn-success">Save</button>
+      <button type="submit" class="btn btn-success">Save Purchase</button>
     </form>
   </div>
 </div>
@@ -142,17 +146,19 @@ function createRow(index) {
     <tr class="item-row">
       <td class="serial text-center">${index + 1}</td>
       <td>
-        <select class="form-select" name="items[${index}][product_id]" required>
+        <select class="form-select product-select" name="items[${index}][product_id]" required>
           <option value="">Select</option>
           @foreach ($products as $product)
-            <option value="{{ $product->id }}">{{ $product->name }}</option>
+            <option value="{{ $product->id }}" data-price="{{ $product->price ?? 0 }}">
+              {{ $product->name }}
+            </option>
           @endforeach
         </select>
       </td>
-      <td><input type="number" name="items[${index}][qty]" class="form-control calc" required></td>
-      <td><input type="number" name="items[${index}][price]" class="form-control calc" required></td>
-      <td><input type="number" name="items[${index}][vat]" class="form-control calc" value="0"></td>
-      <td><input type="number" name="items[${index}][discount]" class="form-control calc" value="0"></td>
+      <td><input type="number" name="items[${index}][qty]" class="form-control calc" value="1" required min="1"></td>
+      <td><input type="number" name="items[${index}][price]" class="form-control calc price-input" value="0" required step="0.01"></td>
+      <td><input type="number" name="items[${index}][vat]" class="form-control calc" value="0" step="0.01"></td>
+      <td><input type="number" name="items[${index}][discount]" class="form-control calc" value="0" step="0.01"></td>
       <td><input type="text" class="form-control total-field" readonly value="0.00"></td>
       <td><button type="button" class="btn btn-outline-danger remove-item"><i class="fa-solid fa-trash"></i></button></td>
     </tr>`;
@@ -169,8 +175,13 @@ function calculateTotals() {
     row.querySelector('.total-field').value = total.toFixed(2);
     grandTotal += total;
   });
+  
   document.getElementById('grandTotal').textContent = grandTotal.toFixed(2);
   document.querySelector('[name="purchase_total"]').value = grandTotal.toFixed(2);
+  
+  // Calculate remaining amount
+  const paidAmount = parseFloat(document.querySelector('[name="paid_amount"]').value) || 0;
+  document.querySelector('[name="remaining_amount"]').value = (grandTotal - paidAmount).toFixed(2);
 }
 
 document.getElementById('addItem').addEventListener('click', function () {
@@ -182,10 +193,13 @@ document.getElementById('addItem').addEventListener('click', function () {
 
 document.addEventListener('click', function (e) {
   if (e.target.classList.contains('remove-item')) {
-    e.target.closest('tr').remove();
-    itemIndex--;
-    updateSerials();
-    calculateTotals();
+    if (document.querySelectorAll('.item-row').length > 1) {
+      e.target.closest('tr').remove();
+      updateSerials();
+      calculateTotals();
+    } else {
+      alert('At least one item is required.');
+    }
   }
 });
 
@@ -195,56 +209,25 @@ document.addEventListener('input', function (e) {
   }
 });
 
-document.getElementById('purchaseForm').addEventListener('submit', function (e) {
-  e.preventDefault();
-  const form = e.target;
-  const formData = new FormData(form);
-  const items = [];
-  document.querySelectorAll('#itemsContainer .item-row').forEach(row => {
-    items.push({
-      product_id: row.querySelector('[name$="[product_id]"]').value,
-      qty: row.querySelector('[name$="[qty]"]').value,
-      price: row.querySelector('[name$="[price]"]').value,
-      vat: row.querySelector('[name$="[vat]"]').value,
-      discount: row.querySelector('[name$="[discount]"]').value
-    });
-  });
-  const data = {
-    supplier_id: formData.get('supplier_id'),
-    purchase_date: formData.get('purchase_date'),
-    delivery_date: formData.get('delivery_date'),
-    warehouse_id: formData.get('warehouse_id'),
-    shipping_address: formData.get('shipping_address'),
-    purchase_total: formData.get('purchase_total'),
-    paid_amount: formData.get('paid_amount'),
-    status_id: formData.get('status_id'),
-    discount: formData.get('discount'),
-    vat: formData.get('vat'),
-    remark: formData.get('remark'),
-    items: items
-  };
-
-  fetch('http://127.0.0.1:8000/api/purchases/', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    },
-    body: JSON.stringify(data)
-  })
-    .then(response => response.ok ? response.json() : response.json().then(err => { throw err; }))
-    .then(result => {
-      alert('✅ Purchase saved successfully!');
-      form.reset();
-      document.getElementById('itemsContaine').innerHTML = createRow(0);
-      itemIndex = 1;
-      updateSerials();
+document.addEventListener('change', function (e) {
+  if (e.target.classList.contains('product-select')) {
+    const selectedOption = e.target.options[e.target.selectedIndex];
+    const price = selectedOption.getAttribute('data-price');
+    const priceInput = e.target.closest('tr').querySelector('.price-input');
+    if (price && priceInput) {
+      priceInput.value = price;
       calculateTotals();
-    })
-    .catch(error => {
-      console.error(' Error:', error);
-      alert(' Purchase saved successfully!');
-    });
+    }
+  }
+  
+  if (e.target.name === 'paid_amount') {
+    calculateTotals();
+  }
+});
+
+// Initialize calculations on page load
+document.addEventListener('DOMContentLoaded', function() {
+  calculateTotals();
 });
 </script>
 
@@ -253,16 +236,15 @@ document.getElementById('purchaseForm').addEventListener('submit', function (e) 
     background-color: #f2f4f8;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   }
- .invoice-header {
-        background: linear-gradient(135deg, #2c3e50, #4ca1af);
-        padding: 20px 30px;
-        border-radius: 12px;
-        color: #fff;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin-bottom: 30px;
-
+  .invoice-header {
+    background: linear-gradient(135deg, #2c3e50, #4ca1af);
+    padding: 20px 30px;
+    border-radius: 12px;
+    color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 30px;
   }
   .card {
     background: #fff;
@@ -273,12 +255,6 @@ document.getElementById('purchaseForm').addEventListener('submit', function (e) 
   h1{
     color: white;
     font-weight: bold;
-    
-  }
-
-  h2, h5 {
-    color: #0d6efd;
-    font-weight: 600;
   }
 
   .form-label {
@@ -371,6 +347,5 @@ document.getElementById('purchaseForm').addEventListener('submit', function (e) 
     }
   }
 </style>
-
 
 @endsection

@@ -16,6 +16,28 @@
   .card-header-actions .btn {
     min-width: 150px;
   }
+
+  .status-badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  
+  .status-pending {
+    background-color: #fff3cd;
+    color: #856404;
+  }
+  
+  .status-completed {
+    background-color: #d1edff;
+    color: #0c5460;
+  }
+  
+  .status-cancel {
+    background-color: #f8d7da;
+    color: #721c24;
+  }
 </style>
 
 <div class="card shadow-sm border-0">
@@ -33,13 +55,14 @@
     </div>
   </div>
 
- <table class="table table-bordered table-striped">
+  <table class="table table-bordered table-striped">
     <tr>
       <th>ID</th>
       <th>Date</th>
-      <th>Supplier </th>
+      <th>Supplier</th>
       <th>Shipping Address</th>
       <th>Total</th>
+      <th>Status</th>
       <th class="d-flex justify-content-center">Action</th>
     </tr>
     @foreach($purchases as $purchase)
@@ -49,18 +72,20 @@
       <td>{{$purchase->supplier}}</td>
       <td>{{$purchase->shipping_address}}</td>
       <td>{{$purchase->purchase_total}}</td>
+      <td>
+        <span class="status-badge status-{{$purchase->status}}">
+          {{ ucfirst($purchase->status) }}
+        </span>
+      </td>
       <td class="d-flex justify-content-center">
         <div class="btn-group">
           <a class="btn btn-primary" href="{{url('purchases/'.$purchase->id)}}">View</a>
           <a class="btn btn-success" href="{{url('purchases/'.$purchase->id.'/edit')}}">Edit</a>
           <a class="btn btn-danger" href="{{url('purchases/'.$purchase->id.'/delete')}}">Delete</a>
-
         </div>
       </td>
     </tr>
-   @endforeach
-   
+    @endforeach
   </table>
-</div>
 </div>
 @endsection

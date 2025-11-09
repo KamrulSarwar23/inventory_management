@@ -15,36 +15,33 @@ class PurchaseController extends Controller
     /**
      * Display a listing of the resource.
      */
-
-
     public function index()
     {
         $purchases = DB::table('purchases as ps')
             ->join('suppliers as sup', 'sup.id', '=', 'ps.supplier_id')
-            ->leftJoin('statuses as st', 'st.id', '=', 'ps.status_id')
             ->select(
                 'ps.id',
                 'ps.created_at',
                 'ps.purchase_total',
                 'ps.shipping_address',
+                'ps.status', // Added status
                 'sup.name as supplier',
-                'st.name as status'
             )
             ->get();
 
         return view("pages.purchases.index", ["purchases" => $purchases]);
     }
 
-
     /**
      * Show the form for creating a new resource.
      */
-
-
     public function create()
     {
         $suppliers = Supplier::all();
-        return view("pages.purchases.create");
+        $products = Product::all();
+        $warehouses = Warehouse::all();
+        
+        return view("pages.purchases.create", compact('suppliers', 'products', 'warehouses'));
     }
 
     /**
@@ -52,7 +49,51 @@ class PurchaseController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $request->validate([
+            'supplier_id' => 'required|exists:suppliers,id',
+            'shipping_address' => 'required|string|max:255',
+            'purchase_total' => 'required|numeric',
+            'warehouse_id' => 'required|exists:warehouses,id',
+            'status' => 'required|in:pending,completed,cancel',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.qty' => 'required|numeric|min:1',
+            'items.*.price' => 'required|numeric|min:0',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $purchase = Purchase::create($request->only([
+                'supplier_id',
+                'shipping_address',
+                'purchase_total',
+                'paid_amount',
+                'status',
+                'discount',
+                'vat',
+                'remark',
+                'warehouse_id',
+                'purchase_date',
+                'delivery_date'
+            ]));
+
+            foreach ($request->items as $item) {
+                PurchaseDetail::create([
+                    'purchase_id' => $purchase->id,
+                    'product_id' => $item['product_id'],
+                    'qty' => $item['qty'],
+                    'price' => $item['price'],
+                    'vat' => $item['vat'] ?? 0,
+                    'discount' => $item['discount'] ?? 0,
+                ]);
+            }
+
+            DB::commit();
+            return redirect('purchases')->with('success', 'Purchase created successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to create purchase: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -60,16 +101,15 @@ class PurchaseController extends Controller
      */
     public function show(string $id)
     {
-        $purchase = Purchase::find($id);
-        $warehouse = Warehouse::find($id);
-        $supplier = Supplier::find($purchase->supplier_id);
+        $purchase = Purchase::with(['supplier', 'warehouse'])->findOrFail($id);
         $details = DB::table('purchases as ps')
             ->join('purchase_details as d', 'ps.id', '=', 'd.purchase_id')
             ->join('products as p', 'p.id', '=', 'd.product_id')
             ->where('ps.id', $id)
             ->select('p.id', 'p.name', 'd.qty', 'd.price', 'd.discount', 'd.vat')
             ->get();
-        return view("pages.purchases.show", ["purchases" => $purchase, "warehouse" => $warehouse, "supplier" => $supplier, "details" => $details]);
+            
+        return view("pages.purchases.show", compact('purchase', 'details'));
     }
 
     /**
@@ -86,7 +126,6 @@ class PurchaseController extends Controller
         return view("pages.purchases.edit", compact('purchase', 'suppliers', 'products', 'warehouses', 'purchaseDetails'));
     }
 
-
     /**
      * Update the specified resource in storage.
      */
@@ -96,65 +135,80 @@ class PurchaseController extends Controller
             'supplier_id' => 'required|exists:suppliers,id',
             'shipping_address' => 'required|string|max:255',
             'purchase_total' => 'required|numeric',
+            'warehouse_id' => 'required|exists:warehouses,id',
+            'status' => 'required|in:pending,completed,cancel',
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|exists:products,id',
             'items.*.qty' => 'required|numeric|min:1',
             'items.*.price' => 'required|numeric|min:0',
         ]);
 
-        $purchase = Purchase::findOrFail($id);
-        $purchase->update($request->only([
-            'supplier_id',
-            'shipping_address',
-            'purchase_total',
-            'paid_amount',
-            'status_id',
-            'discount',
-            'vat',
-            'remark',
-            'warehouse_id',
-            'purchase_date',
-            'delivery_date'
-        ]));
+        DB::beginTransaction();
+        try {
+            $purchase = Purchase::findOrFail($id);
+            $purchase->update($request->only([
+                'supplier_id',
+                'shipping_address',
+                'purchase_total',
+                'paid_amount',
+                'status',
+                'discount',
+                'vat',
+                'remark',
+                'warehouse_id',
+                'purchase_date',
+                'delivery_date'
+            ]));
 
-        // Clear old details and insert new
-        PurchaseDetail::where('purchase_id', $id)->delete();
-        foreach ($request->items as $item) {
-            PurchaseDetail::create([
-                'purchase_id' => $purchase->id,
-                'product_id' => $item['product_id'],
-                'qty' => $item['qty'],
-                'price' => $item['price'],
-                'vat' => $item['vat'] ?? 0,
-                'discount' => $item['discount'] ?? 0,
-            ]);
+            // Clear old details and insert new
+            PurchaseDetail::where('purchase_id', $id)->delete();
+            foreach ($request->items as $item) {
+                PurchaseDetail::create([
+                    'purchase_id' => $purchase->id,
+                    'product_id' => $item['product_id'],
+                    'qty' => $item['qty'],
+                    'price' => $item['price'],
+                    'vat' => $item['vat'] ?? 0,
+                    'discount' => $item['discount'] ?? 0,
+                ]);
+            }
+
+            DB::commit();
+            return redirect('purchases')->with('success', 'Purchase updated successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to update purchase: ' . $e->getMessage());
         }
-
-        return redirect('purchases')->with('success', 'Purchase updated successfully.');
     }
-
 
     /**
      * Remove the specified resource from storage.
      */
     public function delete(string $id)
     {
-        $purchase = Purchase::find($id);
-        $warehouse = Warehouse::find($id);
-        $supplier = Supplier::find($purchase->supplier_id);
+        $purchase = Purchase::with(['supplier', 'warehouse'])->findOrFail($id);
         $details = DB::table('purchases as ps')
             ->join('purchase_details as d', 'ps.id', '=', 'd.purchase_id')
             ->join('products as p', 'p.id', '=', 'd.product_id')
             ->where('ps.id', $id)
             ->select('p.id', 'p.name', 'd.qty', 'd.price', 'd.discount', 'd.vat')
             ->get();
-        return view("pages.purchases.delete", ["purchase" => $purchase, "warehouse" => $warehouse, "supplier" => $supplier, "details" => $details]);
+            
+        return view("pages.purchases.delete", compact('purchase', 'details'));
     }
+
     public function destroy(string $id)
     {
-        $purchase = Purchase::find($id);
-        $purchase->delete();
-        PurchaseDetail::where('purchase_id', $id)->delete();
-        return redirect("purchases");
+        DB::beginTransaction();
+        try {
+            PurchaseDetail::where('purchase_id', $id)->delete();
+            Purchase::findOrFail($id)->delete();
+            
+            DB::commit();
+            return redirect("purchases")->with('success', 'Purchase deleted successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to delete purchase: ' . $e->getMessage());
+        }
     }
 }

@@ -15,9 +15,8 @@
 </div>
 
  
-
  <footer class="main-footer">
-    <strong>Copyright &copy; 2025 <a href="https://adminlte.io">Rony</a>.</strong>
+    <strong>Copyright &copy; 2025 <a href="#">Kamrul Hasan</a>.</strong>
     All rights reserved.
     <div class="float-right d-none d-sm-inline-block">
       <b>Version</b> 3.1.0
@@ -25,7 +24,6 @@
   </footer>
      
 </div>
-@include("layouts.right_slidebar")
 @include("layouts.footer")
 
 
